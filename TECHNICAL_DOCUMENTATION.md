@@ -24,33 +24,52 @@ The architecture follows a strict "Trust but Verify" model. LLMs are utilized so
 ## 3. End-to-End Workflow Diagram
 
 ```mermaid
-graph TD
-    subgraph "Phase 1: Source & Trigger"
-        VB[vb_banking_v1 (Source)] -->|Push/Trigger| GHA[GitHub Actions Runner]
+flowchart TD
+    subgraph Phase1["Phase 1: Source & Trigger"]
+        VB["vb_banking_v1<br/>(Source Branch)"]
+        GHA["GitHub Actions Runner"]
+        VB -->|Push/Trigger| GHA
     end
 
-    subgraph "Phase 2: Conversion Pipeline"
-        GHA -->|Read .vb file| SCRIPT[Conversion Script (Python)]
-        SCRIPT -->|Fetch Prompt Template| PROMPTS[./prompts/*.txt]
-        SCRIPT -->|API Call (Sequential)| LLM[LLM Endpoint (OpenAI/CodeLlama)]
+    subgraph Phase2["Phase 2: Conversion Pipeline"]
+        SCRIPT["Conversion Script<br/>(Python)"]
+        PROMPTS["Prompt Templates<br/>(./prompts/*.txt)"]
+        LLM["LLM Endpoint<br/>(OpenAI/CodeLlama)"]
+        VALIDATE["Local Validation"]
+        FAIL_LOG["Log Failure & Notify"]
+        NEW_BRANCH["Create Feature Branch"]
+        
+        GHA -->|Read .vb file| SCRIPT
+        SCRIPT -->|Fetch Template| PROMPTS
+        SCRIPT -->|API Call Sequential| LLM
         LLM -->|Raw Code| SCRIPT
-        SCRIPT -->|Syntax/Static Check| VALIDATE[Local Validation]
-        VALIDATE -- Fail --> FAIL_LOG[Log Failure & Notify]
-        VALIDATE -- Pass --> NEW_BRANCH[Create Feature Branch]
+        SCRIPT -->|Syntax Check| VALIDATE
+        VALIDATE -->|Fail| FAIL_LOG
+        VALIDATE -->|Pass| NEW_BRANCH
     end
 
-    subgraph "Phase 3: Governance & Review"
-        NEW_BRANCH -->|Auto-Create PR| PR[Pull Request to generated_v1]
-        PR -->|Human Review| APPROVE[Approval]
-        APPROVE -->|Merge| TARGET[cs_generated_v1 / java_generated_v1]
+    subgraph Phase3["Phase 3: Governance & Review"]
+        PR["Pull Request"]
+        APPROVE["Human Approval"]
+        TARGET["cs_generated_v1 /<br/>java_generated_v1"]
+        
+        NEW_BRANCH -->|Auto-Create PR| PR
+        PR -->|Review| APPROVE
+        APPROVE -->|Merge| TARGET
     end
 
-    subgraph "Phase 4: Compilation & Release"
-        TARGET -->|Trigger| BUILD_FLOW[Compilation Workflow]
-        BUILD_FLOW -->|Spin up Docker| DOCKER[Docker Container (SDK)]
-        DOCKER -->|Compile| ARTIFACT[Build Artifact]
-        ARTIFACT -- Success --> RELEASE_PR[PR to compiled_release_v1]
-        ARTIFACT -- Fail --> NOTIFY[Developer Notification]
+    subgraph Phase4["Phase 4: Compilation & Release"]
+        BUILD_FLOW["Compilation Workflow"]
+        DOCKER["Docker Container<br/>(SDK)"]
+        ARTIFACT["Build Artifact"]
+        RELEASE_PR["PR to<br/>compiled_release_v1"]
+        NOTIFY["Developer Notification"]
+        
+        TARGET -->|Trigger| BUILD_FLOW
+        BUILD_FLOW -->|Spin up| DOCKER
+        DOCKER -->|Compile| ARTIFACT
+        ARTIFACT -->|Success| RELEASE_PR
+        ARTIFACT -->|Fail| NOTIFY
     end
 ```
 
@@ -245,3 +264,4 @@ ENTRYPOINT ["dotnet", "build"]
 ## 16. Summary
 
 This system provides a robust, auditable factory for modernizing legacy code. By strictly separating the generation (AI) from the verification (Compiler/Human), it mitigates the stochastic nature of LLMs while harnessing their speed. The dependency on standard GitHub-hosted runners and Docker ensures the pipeline is portable, maintainable, and resilient to environment drift.
+

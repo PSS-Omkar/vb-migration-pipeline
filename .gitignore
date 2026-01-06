@@ -1,0 +1,38 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+*.egg-info/
+
+# Logs
+logs/
+*.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Generated code (local testing only)
+# src/generated/ - commented out to allow .gitkeep
+
+# Build artifacts
+bin/
+obj/
+target/
+*.dll
+*.exe
+*.class
+
+# Secrets (should never be committed)
+.env
+secrets.json

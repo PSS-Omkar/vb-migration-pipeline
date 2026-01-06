@@ -1,0 +1,15 @@
+Convert the following Visual Basic code to {{TARGET_LANG}}.
+
+Follow these steps:
+1. Analyze the VB code structure and identify all classes, methods, and dependencies.
+2. Plan the conversion by mapping VB constructs to {{TARGET_LANG}} equivalents.
+3. Generate the converted code, preserving all business logic.
+4. Review the output for syntax errors and logical consistency.
+
+SOURCE CODE:
+```vb
+{{SOURCE_CODE}}
+```
+
+OUTPUT:
+Provide the converted {{TARGET_LANG}} code in a single markdown code block. Do not include any explanatory text outside the code block.

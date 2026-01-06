@@ -1,0 +1,85 @@
+name: Compilation & Validation Pipeline
+
+on:
+  push:
+    branches:
+      - cs_generated_v1
+      - java_generated_v1
+
+jobs:
+  compile:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    
+    steps:
+      - name: Checkout Generated Code
+        uses: actions/checkout@v4
+      
+      - name: Determine Language
+        id: lang
+        run: |
+          if [[ "${{ github.ref }}" == *"cs_generated"* ]]; then
+            echo "lang=csharp" >> $GITHUB_OUTPUT
+            echo "dockerfile=Dockerfile.build_cs" >> $GITHUB_OUTPUT
+          else
+            echo "lang=java" >> $GITHUB_OUTPUT
+            echo "dockerfile=Dockerfile.build_java" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Build Docker Image
+        run: |
+          docker build -f docker/${{ steps.lang.outputs.dockerfile }} -t build_image .
+      
+      - name: Compile Code in Container
+        id: compile
+        run: |
+          if [[ "${{ steps.lang.outputs.lang }}" == "csharp" ]]; then
+            docker run --rm -v $(pwd):/app build_image dotnet build /app 2>&1 | tee build.log
+          else
+            docker run --rm -v $(pwd):/app build_image mvn clean compile 2>&1 | tee build.log
+          fi
+      
+      - name: Run Unit Tests
+        if: success()
+        run: |
+          if [[ "${{ steps.lang.outputs.lang }}" == "csharp" ]]; then
+            docker run --rm -v $(pwd):/app build_image dotnet test /app
+          else
+            docker run --rm -v $(pwd):/app build_image mvn test
+          fi
+      
+      - name: Create Release PR
+        if: success()
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          BRANCH_NAME="release/compiled-$(date +%s)"
+          
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          git checkout -b "$BRANCH_NAME"
+          git add .
+          git commit -m "Compilation verified - Run ${{ github.run_id }}" --allow-empty
+          git push origin "$BRANCH_NAME"
+          
+          gh pr create \
+            --title "Release: Compiled Code - Run ${{ github.run_id }}" \
+            --body "$(cat build.log)" \
+            --base compiled_release_v1 \
+            --head "$BRANCH_NAME"
+      
+      - name: Notify on Failure
+        if: failure()
+        run: |
+          echo "::error::Compilation failed. See build.log for details."
+          # Integration point for Slack/Teams webhook
+      
+      - name: Upload Build Logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-logs
+          path: build.log

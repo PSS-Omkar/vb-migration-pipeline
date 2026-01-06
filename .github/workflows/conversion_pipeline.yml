@@ -1,0 +1,92 @@
+name: VB to C#/Java Conversion Pipeline
+
+on:
+  push:
+    branches:
+      - vb_banking_v1
+    paths:
+      - 'src/original/**/*.vb'
+
+env:
+  TARGET_LANG: CSHARP  # or JAVA
+  MODEL_VERSION: gpt-4-turbo
+  MAX_RETRIES: 3
+
+jobs:
+  convert:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install Dependencies
+        run: |
+          pip install openai requests tenacity
+      
+      - name: Identify Changed VB Files
+        id: changed-files
+        run: |
+          git diff --name-only ${{ github.event.before }} ${{ github.sha }} | grep '\.vb$' > changed_files.txt || true
+          if [ ! -s changed_files.txt ]; then
+            echo "No VB files changed"
+            exit 0
+          fi
+          echo "files=$(cat changed_files.txt | tr '\n' ' ')" >> $GITHUB_OUTPUT
+      
+      - name: Execute LLM Conversion (Sequential)
+        env:
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+          LLM_ENDPOINT: ${{ secrets.LLM_ENDPOINT }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+        run: |
+          while IFS= read -r file; do
+            echo "Processing: $file"
+            python scripts/convert.py \
+              --source "$file" \
+              --target-lang "$TARGET_LANG" \
+              --model "$MODEL_VERSION" \
+              --max-retries "$MAX_RETRIES"
+          done < changed_files.txt
+      
+      - name: Validate Generated Code
+        run: |
+          bash scripts/validate.sh
+      
+      - name: Create Feature Branch and PR
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          BRANCH_NAME="feat/ai-conversion-$(date +%s)"
+          TARGET_BRANCH="${{ env.TARGET_LANG == 'CSHARP' && 'cs_generated_v1' || 'java_generated_v1' }}"
+          
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          git checkout -b "$BRANCH_NAME"
+          git add src/generated/
+          git commit -m "AI Conversion: Run ${{ github.run_id }}"
+          git push origin "$BRANCH_NAME"
+          
+          gh pr create \
+            --title "AI Code Conversion - Run ${{ github.run_id }}" \
+            --body "Automated conversion from VB to $TARGET_LANG. Review required before merge." \
+            --base "$TARGET_BRANCH" \
+            --head "$BRANCH_NAME"
+      
+      - name: Upload Failure Logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: conversion-failures
+          path: logs/

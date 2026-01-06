@@ -1,0 +1,25 @@
+{
+    "name": "VB to C#/Java Migration Environment",
+    "image": "mcr.microsoft.com/devcontainers/python:3.11",
+    "features": {
+        "ghcr.io/devcontainers/features/docker-in-docker:2": {},
+        "ghcr.io/devcontainers/features/dotnet:2": {
+            "version": "8.0"
+        },
+        "ghcr.io/devcontainers/features/java:1": {
+            "version": "17"
+        }
+    },
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "ms-python.python",
+                "ms-dotnettools.csharp",
+                "vscjava.vscode-java-pack",
+                "github.vscode-pull-request-github"
+            ]
+        }
+    },
+    "postCreateCommand": "pip install openai requests tenacity",
+    "remoteUser": "vscode"
+}

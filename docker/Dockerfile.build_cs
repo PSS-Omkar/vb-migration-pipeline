@@ -1,0 +1,20 @@
+FROM mcr.microsoft.com/dotnet/sdk:8.0
+
+WORKDIR /app
+
+# Copy source files
+COPY src/generated/*.cs ./
+
+# Create a minimal project file for compilation
+RUN echo '<Project Sdk="Microsoft.NET.Sdk">' > App.csproj && \
+    echo '  <PropertyGroup>' >> App.csproj && \
+    echo '    <OutputType>Library</OutputType>' >> App.csproj && \
+    echo '    <TargetFramework>net8.0</TargetFramework>' >> App.csproj && \
+    echo '  </PropertyGroup>' >> App.csproj && \
+    echo '</Project>' >> App.csproj
+
+# Restore dependencies
+RUN dotnet restore
+
+# Default command is to build
+ENTRYPOINT ["dotnet", "build", "--no-restore"]
